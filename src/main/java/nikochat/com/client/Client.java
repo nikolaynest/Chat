@@ -27,6 +27,8 @@ public class Client {
             input = StreamsManager.createInput(socket, this.getClass());
             output = StreamsManager.createOutput(socket, this.getClass());
             register(ui.getClientName());
+
+            //todo: how close the socket/in/out if the user has closed the connection abnormally? just turned off window
         }
 
         /**получение сообщений*/
@@ -45,6 +47,10 @@ public class Client {
         } catch (IOException e) {
             System.out.println("Error closing socket");
             e.printStackTrace();
+            /** аварийный выход */
+        } catch (NoSuchElementException n){
+            stopped = true;
+            output.println("exit");
         }
     }
 

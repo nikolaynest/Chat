@@ -2,6 +2,7 @@ package nikochat.com.ui;
 
 import nikochat.com.server.Server;
 
+import java.util.NoSuchElementException;
 import java.util.Scanner;
 import java.util.StringTokenizer;
 
@@ -35,12 +36,18 @@ public class ServerMenu implements Runnable{
     @Override
     public void run() {
         Scanner scan = new Scanner(System.in);
+        String line = null;
         printHeader();
         menu();
         while (true) {
             System.out.print(">");
+            try {
+                line = scan.nextLine();
+            } catch (NoSuchElementException n){
+                System.out.println("server closed.");
+                break;
+            }
 
-            String line = scan.nextLine();
             StringTokenizer tokenizer = new StringTokenizer(line);
             int tokens = tokenizer.countTokens();
             if (tokens == 1) {
@@ -48,7 +55,7 @@ public class ServerMenu implements Runnable{
                     case "exit": /*server.stop();*/
                         System.exit(0);
                         break;
-                    case "list": //todo
+                    case "list": server.list();
                         break;
                     case "help":
                         menu();

@@ -11,7 +11,10 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.Collections;
+import java.util.Locale;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * Created by nikolay on 23.08.14.
@@ -19,10 +22,7 @@ import java.util.*;
 public class Server {
 
     private ServerSocket server;
-    //TODO: WHAT BETTER TO USE: LIST OR MAP, OR HOW TO SAVE USER INFO?
-    private final Map<String, ServerThread> map = Collections.synchronizedMap(new HashMap<>());
-    private final List<ServerThread> threads = Collections.synchronizedList(new ArrayList<>());
-
+    private final Map<String, ServerThread> map = Collections.synchronizedMap(new TreeMap<>());
 
     public Server() {
         System.out.println("Server is running...");
@@ -38,7 +38,6 @@ public class Server {
         while (true) {
             try {
                 ServerThread serverThread = new ServerThread(server.accept());
-//                threads.add(serverThread);
                 new Thread(serverThread).start();
             } catch (IOException e) {
                 System.out.println("Error accepting client on server");
@@ -52,13 +51,24 @@ public class Server {
         System.out.println("kill " + name);
     }
 
+    public void list() {
+        System.out.println("Список всех подключенных клиентов:");
+        if (map.size() == 0) {
+            System.out.println("0 клиентов");
+        } else {
+            synchronized (map) {
+                map.keySet().forEach(System.out::println);
+            }
+        }
+    }
+
 
     private class ServerThread implements Runnable {
 
         private Socket socket;
-
         private BufferedReader in;
         private PrintWriter out;
+        private String name;
 
         public ServerThread(Socket socket) {
             this.socket = socket;
@@ -75,24 +85,21 @@ public class Server {
         public void run() {
             try {
                 boolean goFurther = true;
-                String name;
                 /** первым делом получаю имя нового "клиента" */
                 while (true) {
                     name = in.readLine();
-                    if (map.get(name)==null) {
+                    if (name == null) {
+                        goFurther = false;
+                        break;
+                    }
+                    if (map.get(name) == null) {
                         map.put(name, this);
                         break;
                     } else {
                         out.println("Пользователь с таким именем уже существует. Выберите другое имя.");
                     }
                 }
-                synchronized (map) {
-                    if (map.containsKey(null)) {
-                        map.remove(null);
-                        goFurther = false;
-                    }
-                }
-                if (goFurther) {
+                if (goFurther) {/*аварийный выход*/
                     String time = getTimeWithoutMillis(LocalTime.now());
                     System.out.println(time + "  " + name + " has joined");
                     System.out.println("numbers of users: " + map.size());
@@ -104,6 +111,9 @@ public class Server {
                     /** читаю из входящего потока сообщения */
                     while (true) {
                         String message = in.readLine();
+                        if (message == null) {
+                            break;
+                        }
                         time = getTimeWithoutMillis(LocalTime.now());
                         if (!message.trim().equals("exit")) {
                             synchronized (map) {
@@ -130,6 +140,7 @@ public class Server {
             } finally {
                 try {
                     closeConnection();
+                    map.remove(name);//todo: does this thread safe?
                 } catch (IOException e) {
                     System.out.println("Error closing socket on server side");
                     e.printStackTrace();
