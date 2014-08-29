@@ -8,6 +8,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.NoSuchElementException;
 
 /**
  * Created by nikolay on 23.08.14.
@@ -67,7 +68,6 @@ public class Client {
         StreamsManager.closeInput(input, this.getClass());
         StreamsManager.closeOutput(output);
         socket.close();
-
     }
 
     private class ReceiveMessage implements Runnable{

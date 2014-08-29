@@ -38,7 +38,7 @@ public class Server {
         while (true) {
             try {
                 ServerThread serverThread = new ServerThread(server.accept());
-                threads.add(serverThread);
+//                threads.add(serverThread);
                 new Thread(serverThread).start();
             } catch (IOException e) {
                 System.out.println("Error accepting client on server");
@@ -52,61 +52,98 @@ public class Server {
         System.out.println("kill " + name);
     }
 
+
     private class ServerThread implements Runnable {
+
+        private Socket socket;
 
         private BufferedReader in;
         private PrintWriter out;
 
         public ServerThread(Socket socket) {
+            this.socket = socket;
             in = StreamsManager.createInput(socket, this.getClass());
             out = StreamsManager.createOutput(socket, this.getClass());
         }
 
-        private String getTime(){
-            LocalTime time = LocalTime.now();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+        private String getTimeWithoutMillis(LocalTime time) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.US);
             return formatter.format(time);
         }
+
         @Override
         public void run() {
-
             try {
+                boolean goFurther = true;
+                String name;
                 /** первым делом получаю имя нового "клиента" */
-                String name = in.readLine();
-                String time = getTime();
-                System.out.println(time + "  " + name + " has joined");
-                System.out.println("numbers of users: " + threads.size());
-                synchronized (threads) {
-                    for (ServerThread st : threads) {
-                        st.out.println(time + "  " + name + " has joined");
+                while (true) {
+                    name = in.readLine();
+                    if (map.get(name)==null) {
+                        map.put(name, this);
+                        break;
+                    } else {
+                        out.println("Пользователь с таким именем уже существует. Выберите другое имя.");
                     }
                 }
-                /** читаю из входящего потока сообщения */
-                while (true) {
-                    String message = in.readLine();
-                    time = getTime();
-                    if (!message.trim().equals("exit")) {
-                        synchronized (threads) {
-                            for (ServerThread st : threads) {
-                                st.out.println(time + "  " + message);
+                synchronized (map) {
+                    if (map.containsKey(null)) {
+                        map.remove(null);
+                        goFurther = false;
+                    }
+                }
+                if (goFurther) {
+                    String time = getTimeWithoutMillis(LocalTime.now());
+                    System.out.println(time + "  " + name + " has joined");
+                    System.out.println("numbers of users: " + map.size());
+                    synchronized (map) {
+                        for (ServerThread st : map.values()) {
+                            st.out.println(time + "  " + name + " has joined");
+                        }
+                    }
+                    /** читаю из входящего потока сообщения */
+                    while (true) {
+                        String message = in.readLine();
+                        time = getTimeWithoutMillis(LocalTime.now());
+                        if (!message.trim().equals("exit")) {
+                            synchronized (map) {
+                                for (ServerThread st : map.values()) {
+                                    st.out.println(time + "  " + message);
 
+                                }
                             }
-                        }
-                        System.out.println(time + "  " + message);
-                    } else {
-                        synchronized (threads) {
-                            for (ServerThread st : threads) {
-                                st.out.println(time + "  " + name + " exit from chat");
+                            System.out.println(time + "  " + message);
+                        } else {
+                            synchronized (map) {
+                                for (ServerThread st : map.values()) {
+                                    st.out.println(time + "  " + name + " exit from chat");
+                                }
                             }
+                            System.out.println(time + "  " + name + " exit from chat");
+                            break;
                         }
-                        System.out.println(time + "  " + name + " exit from chat");
-                        break;
                     }
                 }
             } catch (IOException e) {
                 System.out.println("Error reading name from client...");
                 e.printStackTrace();
+            } finally {
+                try {
+                    closeConnection();
+                } catch (IOException e) {
+                    System.out.println("Error closing socket on server side");
+                    e.printStackTrace();
+                }
             }
+        }
+
+        public void closeConnection() throws IOException {
+            StreamsManager.closeInput(in, this.getClass());
+            System.out.println("input stream is closed");
+            StreamsManager.closeOutput(out);
+            System.out.println("output stream is closed");
+            socket.close();
+            System.out.println("socket is closed");
         }
     }
 }
