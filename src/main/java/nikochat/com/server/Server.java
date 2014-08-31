@@ -22,10 +22,12 @@ import java.util.TreeMap;
 public class Server {
 
     private ServerSocket server;
-    private final Map<String, ServerThread> map = Collections.synchronizedMap(new TreeMap<>());
+    private final Map<String, ServerThread> clients = Collections.synchronizedMap(new TreeMap<>());
 
     public Server() {
         System.out.println("Server is running...");
+        new Thread(new ServerMenu(this)).start();
+
         try {
             server = new ServerSocket(AppConfig.PORT);
         } catch (IOException e) {
@@ -33,12 +35,13 @@ public class Server {
             e.printStackTrace();
         }
 
-        new Thread(new ServerMenu(this)).start();
 
         while (true) {
             try {
                 ServerThread serverThread = new ServerThread(server.accept());
+
                 new Thread(serverThread).start();
+                System.out.println("create user");
             } catch (IOException e) {
                 System.out.println("Error accepting client on server");
                 e.printStackTrace();
@@ -46,18 +49,39 @@ public class Server {
         }
     }
 
+
     public void killSocket(String name) {
         //TODO:
         System.out.println("kill " + name);
+        ServerThread st = clients.get(name);
+        if (st==null){
+            System.out.println("Нет пользователя с таким именем");
+        }else {
+            st.out.println("Сервер недоступен");
+            try {
+                st.closeConnection();
+            } catch (IOException e) {
+                System.out.println("Error close connection killing user "+name);
+                e.printStackTrace();
+            }
+            clients.remove(name);
+            synchronized (clients){
+                for (ServerThread thread:clients.values()){
+                    thread.out.println("Пользователь "+name+" отсоединен.");
+                }
+            }
+
+        }
     }
 
     public void list() {
         System.out.println("Список всех подключенных клиентов:");
-        if (map.size() == 0) {
+        System.out.println(clients.toString());
+        if (clients.size() == 0) {
             System.out.println("0 клиентов");
         } else {
-            synchronized (map) {
-                map.keySet().forEach(System.out::println);
+            synchronized (clients) {
+                clients.keySet().forEach(System.out::println);
             }
         }
     }
@@ -84,7 +108,7 @@ public class Server {
         @Override
         public void run() {
             try {
-                boolean goFurther = true;
+                boolean goFurther = true; /*аварийный выход*/
                 /** первым делом получаю имя нового "клиента" */
                 while (true) {
                     name = in.readLine();
@@ -92,19 +116,19 @@ public class Server {
                         goFurther = false;
                         break;
                     }
-                    if (map.get(name) == null) {
-                        map.put(name, this);
+                    if (clients.get(name) == null) {
+                        clients.put(name, this);
                         break;
                     } else {
                         out.println("Пользователь с таким именем уже существует. Выберите другое имя.");
                     }
                 }
-                if (goFurther) {/*аварийный выход*/
+                if (goFurther) {
                     String time = getTimeWithoutMillis(LocalTime.now());
                     System.out.println(time + "  " + name + " has joined");
-                    System.out.println("numbers of users: " + map.size());
-                    synchronized (map) {
-                        for (ServerThread st : map.values()) {
+                    System.out.println("numbers of users: " + clients.size());
+                    synchronized (clients) {
+                        for (ServerThread st : clients.values()) {
                             st.out.println(time + "  " + name + " has joined");
                         }
                     }
@@ -116,16 +140,16 @@ public class Server {
                         }
                         time = getTimeWithoutMillis(LocalTime.now());
                         if (!message.trim().equals("exit")) {
-                            synchronized (map) {
-                                for (ServerThread st : map.values()) {
-                                    st.out.println(time + "  " + message);
+                            synchronized (clients) {
+                                for (ServerThread st : clients.values()) {
+                                    st.out.println(time + " " + name + ": " + message);
 
                                 }
                             }
                             System.out.println(time + "  " + message);
                         } else {
-                            synchronized (map) {
-                                for (ServerThread st : map.values()) {
+                            synchronized (clients) {
+                                for (ServerThread st : clients.values()) {
                                     st.out.println(time + "  " + name + " exit from chat");
                                 }
                             }
@@ -140,7 +164,7 @@ public class Server {
             } finally {
                 try {
                     closeConnection();
-                    map.remove(name);//todo: does this thread safe?
+                    clients.remove(name);//todo: does this thread safe?
                 } catch (IOException e) {
                     System.out.println("Error closing socket on server side");
                     e.printStackTrace();
@@ -148,13 +172,14 @@ public class Server {
             }
         }
 
-        public void closeConnection() throws IOException {
-            StreamsManager.closeInput(in, this.getClass());
-            System.out.println("input stream is closed");
-            StreamsManager.closeOutput(out);
-            System.out.println("output stream is closed");
+        private void closeConnection() throws IOException {
+
+            in.close();
+            out.close();
+
+//            StreamsManager.closeInput(in, this.getClass());
+//            StreamsManager.closeOutput(out);
             socket.close();
-            System.out.println("socket is closed");
         }
     }
 }

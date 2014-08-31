@@ -1,6 +1,8 @@
 package nikochat.com.client;
 
 import nikochat.com.app.AppConfig;
+import nikochat.com.exceptions.MaxUsersException;
+import nikochat.com.server.Server;
 import nikochat.com.service.StreamsManager;
 import nikochat.com.ui.UserInterface;
 
@@ -22,13 +24,13 @@ public class Client {
     private String name;
 
     public Client(UserInterface ui) {
+
         synchronized (this) {
             socket = connectToServer(ui.getServerIP());
             input = StreamsManager.createInput(socket, this.getClass());
             output = StreamsManager.createOutput(socket, this.getClass());
-            register(ui.getClientName());
-
-            //todo: how close the socket/in/out if the user has closed the connection abnormally? just turned off window
+            name = ui.getClientName();
+            register(name);
         }
 
         /**получение сообщений*/
@@ -37,6 +39,7 @@ public class Client {
         try {
             while (true) {
                 String message = ui.write();
+                if (message.equals("")) continue;
                 output.println(message);
                 if (message.trim().equals("exit")) {
                     stopped = true;
@@ -48,7 +51,7 @@ public class Client {
             System.out.println("Error closing socket");
             e.printStackTrace();
             /** аварийный выход */
-        } catch (NoSuchElementException n){
+        } catch (NoSuchElementException n) {
             stopped = true;
             output.println("exit");
         }
@@ -66,7 +69,6 @@ public class Client {
     }
 
     private void register(String name) {
-        this.name = name;
         output.println(name);
     }
 
@@ -76,13 +78,19 @@ public class Client {
         socket.close();
     }
 
-    private class ReceiveMessage implements Runnable{
+    private class ReceiveMessage implements Runnable {
         @Override
         public void run() {
             while (!stopped) {
                 try {
                     String receive = input.readLine();
-                    System.out.println(receive);
+                    if (receive != null) {
+                        System.out.println(receive);
+                    } else {
+                        System.out.println("Connection to server is broken");
+                        close();
+                        break;
+                    }
                 } catch (IOException e) {
                     stopped = true;
                     System.out.println("Error receiving message from server ");

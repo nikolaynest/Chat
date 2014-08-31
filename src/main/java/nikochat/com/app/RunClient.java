@@ -1,6 +1,7 @@
 package nikochat.com.app;
 
 import nikochat.com.client.Client;
+import nikochat.com.exceptions.MaxUsersException;
 import nikochat.com.ui.TerminalUI;
 
 /**
@@ -8,6 +9,6 @@ import nikochat.com.ui.TerminalUI;
  */
 public class RunClient {
     public static void main(String[] args) {
-        Client client = new Client(new TerminalUI());
+        new Client(new TerminalUI());
     }
 }

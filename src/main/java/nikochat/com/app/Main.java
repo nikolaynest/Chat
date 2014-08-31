@@ -18,7 +18,12 @@ public class Main {
 
     public static void main(String[] args) throws IOException {
 
-            new Server();
+        Main m = new Main();
+        Object ojb = new Object();
+        System.out.println(ojb.toString());
+        m.useRef(ojb);
+        System.out.println("after: "+ojb.toString());
+        new Server();
 
 //        while (true){
 //            System.out.println("somecode");
@@ -41,5 +46,10 @@ public class Main {
 //        map.put(null, 2);
 //        System.out.println(map.size());
 
+
+
+    }
+    private void useRef(Object o){
+        o = null;
     }
 }

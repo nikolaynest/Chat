@@ -15,6 +15,7 @@ public final class AppConfig {
 
     public static final String HOST = props.getProperty("host");
     public static final int PORT = Integer.valueOf(props.getProperty("port"));
+    public static final int MAX_USERS = Integer.valueOf(props.getProperty("max_number_of_users"));
 
     private static Properties initProperties() {
         Properties properties = null;
