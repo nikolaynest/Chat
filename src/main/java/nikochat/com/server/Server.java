@@ -2,20 +2,17 @@ package nikochat.com.server;
 
 import nikochat.com.app.AppConfig;
 import nikochat.com.app.AppConstants;
+import nikochat.com.service.Log;
 import nikochat.com.service.StreamsManager;
 import nikochat.com.ui.ServerMenu;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Collections;
-import java.util.Locale;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * Created by nikolay on 23.08.14.
@@ -25,15 +22,20 @@ public class Server {
 
     private ServerSocket server;
     private final Map<String, ServerThread> clients = Collections.synchronizedMap(new TreeMap<>());
+    private final Queue<String> history = new ConcurrentLinkedQueue<String>();
 
     public Server() {
         System.out.println("Server is running...");
+        Log.write("Server is running...");
+
         new Thread(new ServerMenu(this)).start();
 
         try {
             server = new ServerSocket(AppConfig.PORT);
         } catch (IOException e) {
             System.out.println("Error creating server");
+            Log.write("Error creating server");
+            Log.write(e.getMessage());
             e.printStackTrace();
         }
 
@@ -41,11 +43,14 @@ public class Server {
         while (true) {
             try {
                 Socket accept = server.accept();
+                Log.write("server accept socket");
                 ServerThread serverThread = new ServerThread(accept);
                 new Thread(serverThread).start();
-                System.out.println("create user");
+                Log.write("server start new ServerThread");
             } catch (IOException e) {
                 System.out.println("Error accepting client on server");
+                Log.write("Error accepting client on server");
+                Log.write(e.getMessage());
                 e.printStackTrace();
             }
         }
@@ -73,34 +78,48 @@ public class Server {
                     goFurther = readClientName();
                 } catch (IOException e) {
                     System.out.println("Error reading name from client...");
+                    Log.write("Error reading name from client...");
+                    Log.write(e.getMessage());
                     e.printStackTrace();
                 }
                 if (goFurther) {
                     String time = getTimeWithoutMillis(LocalTime.now());
+                    String invitation = time + " " + name + " has joined";
+                    printHistory();
+                    addToHistory(invitation);
+
                     System.out.println(time + "  " + name + " has joined");
                     System.out.println("numbers of users: " + clients.size());
-                    sendMessage(time, " has joined");
+                    resendMessage(invitation);
 
                     /** читаю из входящего потока сообщения */
                     while (true) {
-                        String message = null;
+                        String received = null;
                         try {
-                            message = in.readLine();
+                            received = in.readLine();
+                            time = getTimeWithoutMillis(LocalTime.now());
                         } catch (IOException e) {
                             System.out.println("Error reading message from client...");
+                            Log.write("Error reading message from client...");
+                            Log.write(e.getMessage());
                             e.printStackTrace();
                         }
-                        if (message == null) {
+                        if (received == null) {
+                            Log.write("received message from client is null");
                             break;
                         }
-                        time = getTimeWithoutMillis(LocalTime.now());
-                        if (sendMessage(time, message)) {
-                            System.out.println(time + "  " + message);
+
+                        if (!received.trim().equals("exit")) {
+                            String local = time + " " + name + ": " + received;
+                            resendMessage(local);
+                            addToHistory(local);
                         } else {
-                            sendMessage(time, message);
-                            ServerThread exitClient = clients.get(name);
-                            exitClient.out.println(AppConstants.EXIT);
-                            System.out.println(time + "  " + name + " exit from chat");
+                            received = time + " " + name + " exit from chat";
+                            addToHistory(received);
+                            resendMessage(received);
+                            out.println("exit");
+                            System.out.println(received);
+                            Log.write(received);
                             break;
                         }
                     }
@@ -111,7 +130,17 @@ public class Server {
                     clients.remove(name);
                 } catch (IOException e) {
                     System.out.println("Error closing socket on server side");
+                    Log.write("Error closing socket on server side");
+                    Log.write(e.getMessage());
                     e.printStackTrace();
+                }
+            }
+        }
+
+        private void printHistory() {
+            synchronized (history) {
+                for (String s : history) {
+                    out.println(s);
                 }
             }
         }
@@ -122,15 +151,18 @@ public class Server {
                 name = in.readLine();
                 if (name == null) {
                     continueProgram = false;
+                    Log.write("read name is null");
                     break;
                 }
                 if (!(clients.size() < AppConfig.MAX_USERS)) {
                     out.println("MAX");
                     continueProgram = false;
+                    Log.write("reduce register new connection");
                     break;
                 }
                 if (clients.get(name) == null) {
                     clients.put(name, this);
+                    Log.write("register new user with the name: " + name);
                     break;
                 } else {
                     out.println(AppConstants.REPEATED_NAME_MESSAGE);
@@ -140,19 +172,12 @@ public class Server {
             return continueProgram;
         }
 
-        private boolean sendMessage(String time, String message) {
-            boolean continueProgram = true;
-            if (message.trim().equals("exit")) {
-                message = " exit from chat";
-                ;
-                continueProgram = false;
-            }
+        private void resendMessage(String message) {
             synchronized (clients) {
                 for (ServerThread st : clients.values()) {
-                    st.out.println(time + "  " + name + ": " + message);
+                    st.out.println(message);
                 }
             }
-            return continueProgram;
         }
 
         private String getTimeWithoutMillis(LocalTime time) {
@@ -166,7 +191,15 @@ public class Server {
 //            StreamsManager.closeInput(in, this.getClass());
 //            StreamsManager.closeOutput(out);
             socket.close();
+            Log.write("close 'input', 'output' and 'socket' for user with the name: "+name);
         }
+    }
+
+    private void addToHistory(String mess) {
+        if (history.size() >= AppConfig.NUM_HISTORY_MESSAGES) {
+            history.remove();
+        }
+        history.add(mess);
     }
 
     public void killSocket(String name) {
@@ -177,8 +210,11 @@ public class Server {
             st.out.println("denied");
             try {
                 st.closeConnection();
+                Log.write("kill socket with the name " + name);
             } catch (IOException e) {
                 System.out.println("Error close connection killing user " + name);
+                Log.write("Error close connection killing user " + name);
+                Log.write(e.getMessage());
                 e.printStackTrace();
             }
             clients.remove(name);

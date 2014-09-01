@@ -1,0 +1,20 @@
+Server is running...
+server accept socket
+server start new ServerThread
+register new user with the name: kola
+server accept socket
+server start new ServerThread
+register new user with the name: sec
+server accept socket
+server start new ServerThread
+reduce register new connection
+close 'input', 'output' and 'socket' for user with the name: kkkk
+17:25:21 sec exit from chat
+close 'input', 'output' and 'socket' for user with the name: sec
+server accept socket
+server start new ServerThread
+register new user with the name: double
+received message from client is null
+close 'input', 'output' and 'socket' for user with the name: double
+close 'input', 'output' and 'socket' for user with the name: double
+kill socket with the name double
