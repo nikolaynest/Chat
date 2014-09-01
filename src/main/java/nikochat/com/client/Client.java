@@ -41,9 +41,12 @@ public class Client {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+
+        /** Отправление сообщений*/
         try {
             while (!stopped) {
                 String message = ui.write();
+                if (stopped) break;
                 if (message.equals("")) continue;
                 output.println(message);
                 if (message.trim().equals("exit")) {
@@ -75,6 +78,10 @@ public class Client {
                                 stopped = true;
                                 break;
                             case "exit":
+                                break;
+                            case "denied":
+                                System.out.println("Сервер недоступен");
+                                stopped = true;
                                 break;
                             default:
                                 System.out.println(receive);

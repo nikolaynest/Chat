@@ -69,55 +69,35 @@ public class Server {
             try {
                 boolean goFurther = true; /*аварийный выход*/
                 /** первым делом получаю имя нового "клиента" */
-                while (true) {
-                    name = in.readLine();
-                    if (name == null) {
-                        goFurther = false;
-                        break;
-                    }
-                    if (!(clients.size() < AppConfig.MAX_USERS)) {
-                        out.println("MAX");
-                        goFurther = false;
-                        break;
-                    }
-                    if (clients.get(name) == null) {
-                        clients.put(name, this);
-                        break;
-                    } else {
-                        out.println(AppConstants.REPEATED_NAME_MESSAGE);
-                        out.print("> ");
-                    }
+                try {
+                    goFurther = readClientName();
+                } catch (IOException e) {
+                    System.out.println("Error reading name from client...");
+                    e.printStackTrace();
                 }
                 if (goFurther) {
                     String time = getTimeWithoutMillis(LocalTime.now());
                     System.out.println(time + "  " + name + " has joined");
                     System.out.println("numbers of users: " + clients.size());
-                    synchronized (clients) {
-                        for (ServerThread st : clients.values()) {
-                            st.out.println(time + "  " + name + " has joined");
-                        }
-                    }
+                    sendMessage(time, " has joined");
+
                     /** читаю из входящего потока сообщения */
                     while (true) {
-                        String message = in.readLine();
+                        String message = null;
+                        try {
+                            message = in.readLine();
+                        } catch (IOException e) {
+                            System.out.println("Error reading message from client...");
+                            e.printStackTrace();
+                        }
                         if (message == null) {
                             break;
                         }
                         time = getTimeWithoutMillis(LocalTime.now());
-                        if (!message.trim().equals(AppConstants.EXIT)) {
-                            synchronized (clients) {
-                                for (ServerThread st : clients.values()) {
-                                    st.out.println(time + " " + name + ": " + message);
-
-                                }
-                            }
+                        if (sendMessage(time, message)) {
                             System.out.println(time + "  " + message);
                         } else {
-                            synchronized (clients) {
-                                for (ServerThread st : clients.values()) {
-                                    st.out.println(time + "  " + name + " exit from chat");
-                                }
-                            }
+                            sendMessage(time, message);
                             ServerThread exitClient = clients.get(name);
                             exitClient.out.println(AppConstants.EXIT);
                             System.out.println(time + "  " + name + " exit from chat");
@@ -125,9 +105,6 @@ public class Server {
                         }
                     }
                 }
-            } catch (IOException e) {
-                System.out.println("Error reading name from client...");
-                e.printStackTrace();
             } finally {
                 try {
                     closeConnection();
@@ -139,16 +116,53 @@ public class Server {
             }
         }
 
+        private boolean readClientName() throws IOException {
+            boolean continueProgram = true;
+            while (true) {
+                name = in.readLine();
+                if (name == null) {
+                    continueProgram = false;
+                    break;
+                }
+                if (!(clients.size() < AppConfig.MAX_USERS)) {
+                    out.println("MAX");
+                    continueProgram = false;
+                    break;
+                }
+                if (clients.get(name) == null) {
+                    clients.put(name, this);
+                    break;
+                } else {
+                    out.println(AppConstants.REPEATED_NAME_MESSAGE);
+                    out.print("> ");
+                }
+            }
+            return continueProgram;
+        }
+
+        private boolean sendMessage(String time, String message) {
+            boolean continueProgram = true;
+            if (message.trim().equals("exit")) {
+                message = " exit from chat";
+                ;
+                continueProgram = false;
+            }
+            synchronized (clients) {
+                for (ServerThread st : clients.values()) {
+                    st.out.println(time + "  " + name + ": " + message);
+                }
+            }
+            return continueProgram;
+        }
+
         private String getTimeWithoutMillis(LocalTime time) {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.US);
             return formatter.format(time);
         }
 
         private void closeConnection() throws IOException {
-
             in.close();
             out.close();
-
 //            StreamsManager.closeInput(in, this.getClass());
 //            StreamsManager.closeOutput(out);
             socket.close();
@@ -156,13 +170,11 @@ public class Server {
     }
 
     public void killSocket(String name) {
-        //TODO:
-        System.out.println("kill " + name);
         ServerThread st = clients.get(name);
         if (st == null) {
             System.out.println("Нет пользователя с таким именем");
         } else {
-            st.out.println("Сервер недоступен");
+            st.out.println("denied");
             try {
                 st.closeConnection();
             } catch (IOException e) {
