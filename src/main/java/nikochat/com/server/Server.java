@@ -1,6 +1,7 @@
 package nikochat.com.server;
 
 import nikochat.com.app.AppConfig;
+import nikochat.com.app.AppConstants;
 import nikochat.com.service.StreamsManager;
 import nikochat.com.ui.ServerMenu;
 
@@ -21,6 +22,7 @@ import java.util.TreeMap;
  */
 public class Server {
 
+
     private ServerSocket server;
     private final Map<String, ServerThread> clients = Collections.synchronizedMap(new TreeMap<>());
 
@@ -38,8 +40,8 @@ public class Server {
 
         while (true) {
             try {
-                ServerThread serverThread = new ServerThread(server.accept());
-
+                Socket accept = server.accept();
+                ServerThread serverThread = new ServerThread(accept);
                 new Thread(serverThread).start();
                 System.out.println("create user");
             } catch (IOException e) {
@@ -48,44 +50,6 @@ public class Server {
             }
         }
     }
-
-
-    public void killSocket(String name) {
-        //TODO:
-        System.out.println("kill " + name);
-        ServerThread st = clients.get(name);
-        if (st==null){
-            System.out.println("Нет пользователя с таким именем");
-        }else {
-            st.out.println("Сервер недоступен");
-            try {
-                st.closeConnection();
-            } catch (IOException e) {
-                System.out.println("Error close connection killing user "+name);
-                e.printStackTrace();
-            }
-            clients.remove(name);
-            synchronized (clients){
-                for (ServerThread thread:clients.values()){
-                    thread.out.println("Пользователь "+name+" отсоединен.");
-                }
-            }
-
-        }
-    }
-
-    public void list() {
-        System.out.println("Список всех подключенных клиентов:");
-        System.out.println(clients.toString());
-        if (clients.size() == 0) {
-            System.out.println("0 клиентов");
-        } else {
-            synchronized (clients) {
-                clients.keySet().forEach(System.out::println);
-            }
-        }
-    }
-
 
     private class ServerThread implements Runnable {
 
@@ -100,11 +64,6 @@ public class Server {
             out = StreamsManager.createOutput(socket, this.getClass());
         }
 
-        private String getTimeWithoutMillis(LocalTime time) {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.US);
-            return formatter.format(time);
-        }
-
         @Override
         public void run() {
             try {
@@ -116,11 +75,17 @@ public class Server {
                         goFurther = false;
                         break;
                     }
+                    if (!(clients.size() < AppConfig.MAX_USERS)) {
+                        out.println("MAX");
+                        goFurther = false;
+                        break;
+                    }
                     if (clients.get(name) == null) {
                         clients.put(name, this);
                         break;
                     } else {
-                        out.println("Пользователь с таким именем уже существует. Выберите другое имя.");
+                        out.println(AppConstants.REPEATED_NAME_MESSAGE);
+                        out.print("> ");
                     }
                 }
                 if (goFurther) {
@@ -139,7 +104,7 @@ public class Server {
                             break;
                         }
                         time = getTimeWithoutMillis(LocalTime.now());
-                        if (!message.trim().equals("exit")) {
+                        if (!message.trim().equals(AppConstants.EXIT)) {
                             synchronized (clients) {
                                 for (ServerThread st : clients.values()) {
                                     st.out.println(time + " " + name + ": " + message);
@@ -153,6 +118,8 @@ public class Server {
                                     st.out.println(time + "  " + name + " exit from chat");
                                 }
                             }
+                            ServerThread exitClient = clients.get(name);
+                            exitClient.out.println(AppConstants.EXIT);
                             System.out.println(time + "  " + name + " exit from chat");
                             break;
                         }
@@ -164,12 +131,17 @@ public class Server {
             } finally {
                 try {
                     closeConnection();
-                    clients.remove(name);//todo: does this thread safe?
+                    clients.remove(name);
                 } catch (IOException e) {
                     System.out.println("Error closing socket on server side");
                     e.printStackTrace();
                 }
             }
+        }
+
+        private String getTimeWithoutMillis(LocalTime time) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.US);
+            return formatter.format(time);
         }
 
         private void closeConnection() throws IOException {
@@ -180,6 +152,41 @@ public class Server {
 //            StreamsManager.closeInput(in, this.getClass());
 //            StreamsManager.closeOutput(out);
             socket.close();
+        }
+    }
+
+    public void killSocket(String name) {
+        //TODO:
+        System.out.println("kill " + name);
+        ServerThread st = clients.get(name);
+        if (st == null) {
+            System.out.println("Нет пользователя с таким именем");
+        } else {
+            st.out.println("Сервер недоступен");
+            try {
+                st.closeConnection();
+            } catch (IOException e) {
+                System.out.println("Error close connection killing user " + name);
+                e.printStackTrace();
+            }
+            clients.remove(name);
+            synchronized (clients) {
+                for (ServerThread thread : clients.values()) {
+                    thread.out.println("Пользователь " + name + " отсоединен.");
+                }
+            }
+
+        }
+    }
+
+    public void list() {
+        System.out.println("Список всех подключенных клиентов:");
+        if (clients.size() == 0) {
+            System.out.println("0 клиентов");
+        } else {
+            synchronized (clients) {
+                clients.keySet().forEach(System.out::println);
+            }
         }
     }
 }

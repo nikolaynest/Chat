@@ -1,8 +1,7 @@
 package nikochat.com.client;
 
 import nikochat.com.app.AppConfig;
-import nikochat.com.exceptions.MaxUsersException;
-import nikochat.com.server.Server;
+import nikochat.com.app.AppConstants;
 import nikochat.com.service.StreamsManager;
 import nikochat.com.ui.UserInterface;
 
@@ -16,6 +15,7 @@ import java.util.NoSuchElementException;
  * Created by nikolay on 23.08.14.
  */
 public class Client {
+
 
     private Socket socket;
     private BufferedReader input;
@@ -37,7 +37,12 @@ public class Client {
         new Thread(new ReceiveMessage()).start();
 
         try {
-            while (true) {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        try {
+            while (!stopped) {
                 String message = ui.write();
                 if (message.equals("")) continue;
                 output.println(message);
@@ -54,6 +59,37 @@ public class Client {
         } catch (NoSuchElementException n) {
             stopped = true;
             output.println("exit");
+        }
+    }
+
+    private class ReceiveMessage implements Runnable {
+        @Override
+        public void run() {
+            while (!stopped) {
+                try {
+                    String receive = input.readLine();
+                    if (receive != null) {
+                        switch (receive) {
+                            case "MAX":
+                                System.out.println("Достигнуто максимальное количество пользователей");
+                                stopped = true;
+                                break;
+                            case "exit":
+                                break;
+                            default:
+                                System.out.println(receive);
+                        }
+                    } else {
+                        System.out.println(AppConstants.SERVER_UNAVAILABLE_MESSAGE);
+                        close();
+                        break;
+                    }
+                } catch (IOException e) {
+                    stopped = true;
+                    System.out.println("Error receiving message from server ");
+                    e.printStackTrace();
+                }
+            }
         }
     }
 
@@ -76,27 +112,5 @@ public class Client {
         StreamsManager.closeInput(input, this.getClass());
         StreamsManager.closeOutput(output);
         socket.close();
-    }
-
-    private class ReceiveMessage implements Runnable {
-        @Override
-        public void run() {
-            while (!stopped) {
-                try {
-                    String receive = input.readLine();
-                    if (receive != null) {
-                        System.out.println(receive);
-                    } else {
-                        System.out.println("Connection to server is broken");
-                        close();
-                        break;
-                    }
-                } catch (IOException e) {
-                    stopped = true;
-                    System.out.println("Error receiving message from server ");
-                    e.printStackTrace();
-                }
-            }
-        }
     }
 }
