@@ -26,7 +26,7 @@ public class Client {
     public Client(UserInterface ui) {
 
         synchronized (this) {
-            socket = connectToServer(ui.getServerIP());
+            socket = connectToServer(ui.getServerIP(), ui.getPort());
             input = StreamsManager.createInput(socket, this.getClass());
             output = StreamsManager.createOutput(socket, this.getClass());
             name = ui.getClientName();
@@ -100,10 +100,10 @@ public class Client {
         }
     }
 
-    private Socket connectToServer(String ip) {
+    private Socket connectToServer(String ip, int port) {
         Socket socket = null;
         try {
-            socket = new Socket(ip, AppConfig.PORT);
+            socket = new Socket(ip, port);
         } catch (IOException e) {
             System.out.println("Error creating socket in client");
             e.printStackTrace();

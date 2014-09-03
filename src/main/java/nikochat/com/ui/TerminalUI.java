@@ -1,5 +1,7 @@
 package nikochat.com.ui;
 
+import nikochat.com.app.AppConfig;
+
 import java.util.Scanner;
 
 /**
@@ -30,6 +32,11 @@ public class TerminalUI implements UserInterface {
     @Override
     public String write() {
         return scanner.nextLine();
+    }
+
+    @Override
+    public int getPort() {
+        return AppConfig.PORT;
     }
 
 

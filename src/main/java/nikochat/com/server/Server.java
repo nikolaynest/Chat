@@ -22,7 +22,7 @@ public class Server {
 
     private ServerSocket server;
     private final Map<String, ServerThread> clients = Collections.synchronizedMap(new TreeMap<>());
-    private final Queue<String> history = new ConcurrentLinkedQueue<String>();
+    private final Queue<String> history = new ConcurrentLinkedQueue<>();
 
     public Server() {
         System.out.println("Server is running...");
@@ -139,9 +139,7 @@ public class Server {
 
         private void printHistory() {
             synchronized (history) {
-                for (String s : history) {
-                    out.println(s);
-                }
+                history.forEach(out::println);
             }
         }
 
@@ -188,8 +186,6 @@ public class Server {
         private void closeConnection() throws IOException {
             in.close();
             out.close();
-//            StreamsManager.closeInput(in, this.getClass());
-//            StreamsManager.closeOutput(out);
             socket.close();
             Log.write("close 'input', 'output' and 'socket' for user with the name: "+name);
         }

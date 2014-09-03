@@ -1,6 +1,7 @@
 package nikochat.com.ui;
 
 import nikochat.com.server.Server;
+import nikochat.com.service.Log;
 
 import java.util.NoSuchElementException;
 import java.util.Scanner;
@@ -9,7 +10,7 @@ import java.util.StringTokenizer;
 /**
  * Created by nikolay on 25.08.14.
  */
-public class ServerMenu implements Runnable{
+public class ServerMenu implements Runnable {
 
     public ServerMenu(Server server) {
         this.server = server;
@@ -19,8 +20,7 @@ public class ServerMenu implements Runnable{
 
     public static void printHeader() {
         System.out.println("####################################################################");
-        System.out.print("#          Welcome to chat!                                        #\n");
-//        System.out.println("####################################################################");
+        System.out.println("#                       Welcome to chat!                           #");
     }
 
     public static void menu() {
@@ -36,14 +36,14 @@ public class ServerMenu implements Runnable{
     @Override
     public void run() {
         Scanner scan = new Scanner(System.in);
-        String line = null;
+        String line;
         printHeader();
         menu();
         while (true) {
             System.out.print(">");
             try {
                 line = scan.nextLine();
-            } catch (NoSuchElementException n){
+            } catch (NoSuchElementException n) {
                 System.out.println("server closed.");
                 break;
             }
@@ -52,10 +52,13 @@ public class ServerMenu implements Runnable{
             int tokens = tokenizer.countTokens();
             if (tokens == 1) {
                 switch (line) {
-                    case "exit": /*server.stop();*/
+                    case "exit":
+                        Log.write("server stopped");
+                        Log.close();
                         System.exit(0);
                         break;
-                    case "list": server.list();
+                    case "list":
+                        server.list();
                         break;
                     case "help":
                         menu();
@@ -63,15 +66,13 @@ public class ServerMenu implements Runnable{
                     default:
                         System.out.println("Incorrect input. Enter again.");
                 }
-
             } else {
                 String[] words = line.split(" ");
-                if (words[0].equals("kill")){
+                if (words[0].equals("kill")) {
                     server.killSocket(words[1]);
                 }
             }
             System.out.print(">");
-
         }
     }
 }

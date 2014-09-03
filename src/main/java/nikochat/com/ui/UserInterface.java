@@ -8,7 +8,5 @@ public interface UserInterface {
     String getServerIP();
     String getClientName();
     String write();
-
-
-
+    int getPort();
 }
