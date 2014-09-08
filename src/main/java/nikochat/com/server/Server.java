@@ -39,7 +39,6 @@ public class Server {
             e.printStackTrace();
         }
 
-
         while (true) {
             try {
                 Socket accept = server.accept();
@@ -56,17 +55,111 @@ public class Server {
         }
     }
 
-    private class ServerThread implements Runnable {
+
+    /**
+     * Add to history message from system. Store last NUM_HISTORY_MESSAGE
+     * @param mess message from system (from users or the server).
+     */
+    private void addToHistory(String mess) {
+        if (history.size() >= AppConfig.NUM_HISTORY_MESSAGES) {
+            history.remove();
+        }
+        history.add(mess);
+    }
+
+    /**
+     * Close connection with specified user name
+     * @param name user name
+     */
+    public void killSocket(String name) {
+        ServerThread st = clients.get(name);
+        if (st == null) {
+            System.out.println("Нет пользователя с таким именем");
+        } else {
+            st.out.println(AppConstants.DENIED);
+            try {
+                st.closeConnection();
+                Log.write("kill socket with the name " + name);
+            } catch (IOException e) {
+                System.out.println("Error close connection killing user " + name);
+                Log.write("Error close connection killing user " + name);
+                Log.write(e.getMessage());
+                e.printStackTrace();
+            }
+            clients.remove(name);
+            notifyAllClients();
+            synchronized (clients) {
+                for (ServerThread thread : clients.values()) {
+                    thread.out.println("Пользователь " + name + " отсоединен.");
+                }
+            }
+
+        }
+    }
+
+    /**
+     * this method prints the list of all users available in real-time chatting
+     */
+    public void list() {
+        System.out.println("Список всех подключенных клиентов:");
+        if (clients.size() == 0) {
+            System.out.println("0 клиентов");
+        } else {
+            synchronized (clients) {
+                clients.keySet().forEach(System.out::println);
+            }
+        }
+    }
+
+    /**
+     * Method update list of the online users.
+     * Uses specific protocol, which is starts and ends with service command AppConstants.LIST
+     * for the reason that client part of the application will
+     * can distinguish usual message from user names list
+     */
+    private synchronized void notifyAllClients() {
+        String[] list = clients.keySet().toArray(new String[clients.size()]);
+        StringBuffer buffer = new StringBuffer(list.length);
+        for (String s : list) {
+            buffer.append(s).append("\n");
+        }
+        String resultList = buffer.toString();
+        buffer = null;
+        resendMessage(AppConstants.LIST);
+        synchronized (clients) {
+            for (ServerThread st : clients.values()) {
+                st.out.print(resultList);
+                st.out.println(AppConstants.LIST);
+            }
+        }
+    }
+
+    /**
+     * Broadcast sending message to all clients
+     * @param message
+     */
+    private void resendMessage(String message) {
+        synchronized (clients) {
+            for (ServerThread st : clients.values()) {
+                st.out.println(message);
+            }
+        }
+    }
+
+    /**
+     * Separate thread for handling registered client
+     */
+    class ServerThread implements Runnable {
 
         private Socket socket;
-        private BufferedReader in;
         private PrintWriter out;
+        private BufferedReader in;
         private String name;
 
         public ServerThread(Socket socket) {
             this.socket = socket;
-            in = StreamsManager.createInput(socket, this.getClass());
             out = StreamsManager.createOutput(socket, this.getClass());
+            in = StreamsManager.createInput(socket, this.getClass());
         }
 
         @Override
@@ -87,9 +180,6 @@ public class Server {
                     String invitation = time + " " + name + " has joined";
                     printHistory();
                     addToHistory(invitation);
-
-                    System.out.println(time + "  " + name + " has joined");
-                    System.out.println("numbers of users: " + clients.size());
                     resendMessage(invitation);
 
                     /** читаю из входящего потока сообщения */
@@ -109,16 +199,15 @@ public class Server {
                             break;
                         }
 
-                        if (!received.trim().equals("exit")) {
-                            String local = time + " " + name + ": " + received;
-                            resendMessage(local);
-                            addToHistory(local);
+                        if (!received.trim().equals(AppConstants.EXIT)) {
+                            String str = time + " " + name + ": " + received;
+                            resendMessage(str);
+                            addToHistory(str);
                         } else {
                             received = time + " " + name + " exit from chat";
                             addToHistory(received);
                             resendMessage(received);
-                            out.println("exit");
-                            System.out.println(received);
+                            out.println(AppConstants.EXIT);
                             Log.write(received);
                             break;
                         }
@@ -127,7 +216,12 @@ public class Server {
             } finally {
                 try {
                     closeConnection();
-                    clients.remove(name);
+                    if (name != null) {
+                        if (clients.containsKey(name)) {
+                            clients.remove(name);
+                            notifyAllClients();
+                        }
+                    }
                 } catch (IOException e) {
                     System.out.println("Error closing socket on server side");
                     Log.write("Error closing socket on server side");
@@ -137,12 +231,23 @@ public class Server {
             }
         }
 
+
+        /**
+         * prints messages from history collection
+         * to output stream of this client thread
+         */
         private void printHistory() {
             synchronized (history) {
                 history.forEach(out::println);
             }
         }
 
+        /**
+         * reads and handles name received from client
+         * @return true if registering finished with success,
+         *         false - if received name is null or server stores maximum numbers of clients
+         * @throws IOException some errors while reading from input stream
+         */
         private boolean readClientName() throws IOException {
             boolean continueProgram = true;
             while (true) {
@@ -153,31 +258,31 @@ public class Server {
                     break;
                 }
                 if (!(clients.size() < AppConfig.MAX_USERS)) {
-                    out.println("MAX");
+                    out.println(AppConstants.MAX_USERS_ERROR);
                     continueProgram = false;
-                    Log.write("reduce register new connection");
+                    Log.write("reduce addObserver new connection");
                     break;
                 }
                 if (clients.get(name) == null) {
                     clients.put(name, this);
-                    Log.write("register new user with the name: " + name);
+                    Log.write("addObserver new user with the name: " + name);
+                    out.println(AppConstants.OK_REGISTERED);
+
+                    notifyAllClients();
                     break;
                 } else {
-                    out.println(AppConstants.REPEATED_NAME_MESSAGE);
+                    out.println(AppConstants.REPEATED_NAME_ERROR);
                     out.print("> ");
                 }
             }
             return continueProgram;
         }
 
-        private void resendMessage(String message) {
-            synchronized (clients) {
-                for (ServerThread st : clients.values()) {
-                    st.out.println(message);
-                }
-            }
-        }
-
+        /**
+         * Gives String representation of time without millis
+         * @param time
+         * @return String with formatted time without millis
+         */
         private String getTimeWithoutMillis(LocalTime time) {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.US);
             return formatter.format(time);
@@ -187,50 +292,7 @@ public class Server {
             in.close();
             out.close();
             socket.close();
-            Log.write("close 'input', 'output' and 'socket' for user with the name: "+name);
-        }
-    }
-
-    private void addToHistory(String mess) {
-        if (history.size() >= AppConfig.NUM_HISTORY_MESSAGES) {
-            history.remove();
-        }
-        history.add(mess);
-    }
-
-    public void killSocket(String name) {
-        ServerThread st = clients.get(name);
-        if (st == null) {
-            System.out.println("Нет пользователя с таким именем");
-        } else {
-            st.out.println("denied");
-            try {
-                st.closeConnection();
-                Log.write("kill socket with the name " + name);
-            } catch (IOException e) {
-                System.out.println("Error close connection killing user " + name);
-                Log.write("Error close connection killing user " + name);
-                Log.write(e.getMessage());
-                e.printStackTrace();
-            }
-            clients.remove(name);
-            synchronized (clients) {
-                for (ServerThread thread : clients.values()) {
-                    thread.out.println("Пользователь " + name + " отсоединен.");
-                }
-            }
-
-        }
-    }
-
-    public void list() {
-        System.out.println("Список всех подключенных клиентов:");
-        if (clients.size() == 0) {
-            System.out.println("0 клиентов");
-        } else {
-            synchronized (clients) {
-                clients.keySet().forEach(System.out::println);
-            }
+            Log.write("close 'input', 'output' and 'socket' for user with the name: " + name);
         }
     }
 }

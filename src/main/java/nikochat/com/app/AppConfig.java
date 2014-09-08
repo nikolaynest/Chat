@@ -1,8 +1,6 @@
 package nikochat.com.app;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
 import java.util.Properties;
 
 /**
@@ -10,28 +8,47 @@ import java.util.Properties;
  */
 public final class AppConfig {
 
-    private static final String RELATIVE_PATH_TO_PROPERTIES = "./src/main/resources/config.properties";
-    private static Properties props = initProperties();
-    public static final String HOST = props.getProperty("host");
+    private static final String CONFIG_PROPERTIES = "config.properties";
+    private static final String separator = System.getProperty("file.separator");
+    public static final String RELATIVE_LOG_PATH = System.getProperty("user.home")+separator+"err_action.log";
+
+    static {
+        File logfile = new File(RELATIVE_LOG_PATH);
+        if (!logfile.exists()){
+            try {
+                logfile.createNewFile();
+            } catch (IOException e) {
+                System.out.println("can't create file "+RELATIVE_LOG_PATH);
+                e.printStackTrace();
+            }
+        }
+    }
+
+//    private static InputStream logInputStream = this.getClass().getClassLoader().getResourceAsStream(RELATIVE_LOG_PATH);
+//    private static InputStream propsInputStream = this.getClass().getClassLoader().getResourceAsStream(CONFIG_PROPERTIES);
+
+    private static Properties props = new AppConfig().initProperties();
+    public static final String HOST = props.getProperty("ip_address");
 
     public static final int PORT = Integer.valueOf(props.getProperty("port"));
     public static final int MAX_USERS = Integer.valueOf(props.getProperty("max_number_of_users"));
     public static final int NUM_HISTORY_MESSAGES = Integer.valueOf(props.getProperty("last_N_messages"));
-    public static final String RELATIVE_LOG_PATH = "./src/main/resources/err_action.log";
 
-    private static Properties initProperties() {
+    private Properties initProperties() {
         Properties properties = null;
-        try (FileInputStream input = new FileInputStream(RELATIVE_PATH_TO_PROPERTIES)) {
+//        try (FileInputStream input = new FileInputStream(CONFIG_PROPERTIES)) {
             properties = new Properties();
-            properties.load(input);
-
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
+        try {
+            properties.load(getClass().getClassLoader().getResourceAsStream(CONFIG_PROPERTIES));
         } catch (IOException e) {
             e.printStackTrace();
         }
+//        } catch (FileNotFoundException e) {
+//            e.printStackTrace();
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
         return properties;
     }
-
 
 }

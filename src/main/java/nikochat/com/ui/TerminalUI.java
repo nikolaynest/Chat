@@ -1,13 +1,15 @@
 package nikochat.com.ui;
 
 import nikochat.com.app.AppConfig;
+import nikochat.com.app.AppConstants;
+import nikochat.com.exceptions.ServerUnavailableException;
 
 import java.util.Scanner;
 
 /**
  * Created by nikolay on 23.08.14.
  */
-public class TerminalUI implements UserInterface {
+public class TerminalUI {
 
     private Scanner scanner;
 
@@ -15,7 +17,6 @@ public class TerminalUI implements UserInterface {
         scanner = new Scanner(System.in);
     }
 
-    @Override
     public String getServerIP() {
         System.out.println("Enter IP for connection to server");
         System.out.println("Format: XXX.XXX.XXX.XXX");
@@ -23,21 +24,20 @@ public class TerminalUI implements UserInterface {
         return scanner.nextLine();
     }
 
-    @Override
     public String getClientName() {
         System.out.print("Enter your name: >");
         return scanner.nextLine();
     }
 
-    @Override
-    public String write() {
+    public String read() {
         return scanner.nextLine();
     }
 
-    @Override
     public int getPort() {
         return AppConfig.PORT;
     }
 
-
+    public void write(String line) {
+        System.out.println(line);
+    }
 }

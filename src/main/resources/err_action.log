@@ -1,6 +1,0 @@
-Server is running...
-server accept socket
-server start new ServerThread
-register new user with the name: hello
-received message from client is null
-close 'input', 'output' and 'socket' for user with the name: hello

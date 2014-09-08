@@ -9,6 +9,7 @@ import java.io.PrintWriter;
  * Created by nikolay on 01.09.14.
  */
 public class Log {
+
     private static PrintWriter log;
 
     static {
@@ -24,7 +25,7 @@ public class Log {
         log.flush();
     }
 
-    public static void close(){
+    public static void close() {
         log.close();
     }
 }
