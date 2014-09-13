@@ -10,6 +10,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.IOException;
+import java.net.ConnectException;
 
 /**
  * Created by nikolay on 02.09.14.
@@ -105,22 +107,29 @@ public class RegisterFrame extends JFrame {
                 ip = ipText.getText();
 
                 if (name != null && ip != null && port != 0) {
-                    client.connect(ip, port);
+
                     try {
-                        client.register(name);
-                        SwingUtilities.invokeLater(new Runnable() {
-                            @Override
-                            public void run() {
-                                new MainFrame(client);
-                            }
-                        });
-                        dispose();
-                    } catch (DuplicateNameException e1) {
+                        client.connect(ip, port);
+                        try {
+                            client.register(name);
+                            SwingUtilities.invokeLater(new Runnable() {
+                                @Override
+                                public void run() {
+                                    new MainFrame(client);
+                                }
+                            });
+                            dispose();
+                        } catch (DuplicateNameException e1) {
+                            JOptionPane.showMessageDialog(null,
+                                    AppConstants.REPEATED_NAME_MESSAGE, "Info", JOptionPane.WARNING_MESSAGE);
+                        } catch (MaxUsersException me) {
+                            JOptionPane.showMessageDialog(null,
+                                    AppConstants.MAX_USERS_MESSAGE, "Info", JOptionPane.INFORMATION_MESSAGE);
+                            System.exit(0);
+                        }
+                    } catch (IOException e1) {
                         JOptionPane.showMessageDialog(null,
-                                AppConstants.REPEATED_NAME_MESSAGE, "Info", JOptionPane.WARNING_MESSAGE);
-                    } catch (MaxUsersException me) {
-                        JOptionPane.showMessageDialog(null,
-                                AppConstants.MAX_USERS_MESSAGE, "Info", JOptionPane.INFORMATION_MESSAGE);
+                                AppConstants.SERVER_UNAVAILABLE_MESSAGE, "Info", JOptionPane.INFORMATION_MESSAGE);
                         System.exit(0);
                     }
                 } else {

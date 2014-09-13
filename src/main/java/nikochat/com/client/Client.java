@@ -48,7 +48,7 @@ public class Client {
      * @param ip
      * @param port
      */
-    public synchronized void connect(String ip, int port) {
+    public synchronized void connect(String ip, int port) throws IOException {
         socket = connectToServer(ip, port);
         output = StreamsManager.createOutput(socket, this.getClass());
         input = StreamsManager.createInput(socket, this.getClass());
@@ -139,14 +139,9 @@ public class Client {
         }
     }
 
-    private Socket connectToServer(String ip, int port) {
+    private Socket connectToServer(String ip, int port) throws IOException {
         Socket socket = null;
-        try {
-            socket = new Socket(ip, port);
-        } catch (IOException e) {
-            System.out.println("Error creating socket in client");
-            e.printStackTrace();
-        }
+        socket = new Socket(ip, port);
         return socket;
     }
 
